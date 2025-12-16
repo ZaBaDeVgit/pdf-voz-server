@@ -243,6 +243,13 @@
                 return;
             }
 
+            // Límite cliente: 10 MB
+            const MAX_FILE_SIZE = 10 * 1024 * 1024;
+            if (file.size > MAX_FILE_SIZE) {
+                updateStatus('El archivo es demasiado grande. Tamaño máximo: 10 MB.', 'error');
+                return;
+            }
+
             selectedFile = file;
             document.getElementById('file-label').textContent = file.name;
             document.getElementById('reset-btn').classList.remove('hidden');
@@ -300,9 +307,22 @@
                     throw new Error(err && (err.error || err._raw) ? (err.error || err._raw) : 'Servidor no responde correctamente');
                 }
             } catch (error) {
+                // Intentar /api/ping como fallback (útil si el navegador bloquea /api/status por adblock)
+                try {
+                    const pingResp = await fetch(`${serverUrl}/api/ping`);
+                    if (pingResp.ok) {
+                        status.textContent = 'Conectado (ping)';
+                        status.className = 'text-sm text-green-400';
+                        updateStatus('Servidor responde a /api/ping. Es posible que una extensión bloquee /api/status.', 'success');
+                        return;
+                    }
+                } catch (e) {
+                    // ignore
+                }
+
                 status.textContent = 'Error de conexión';
                 status.className = 'text-sm text-red-400';
-                updateStatus('No se puede conectar al servidor. Verifica la URL.', 'error');
+                updateStatus('No se puede conectar al servidor. Verifica la URL o prueba en modo incógnito (extensiones pueden bloquear peticiones).', 'error');
             }
         }
 

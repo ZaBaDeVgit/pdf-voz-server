@@ -21,6 +21,8 @@ CORS(app)  # Permitir peticiones desde cualquier origen
 # Configuración
 UPLOAD_FOLDER = 'uploads'
 OUTPUT_FOLDER = 'outputs'
+# Límite de tamaño de subida (10 MB)
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
@@ -60,6 +62,18 @@ def api_status():
             "/api/download/<filename>": "GET - Descargar archivo MP3"
         }
     })
+
+@app.route('/api/ping')
+def api_ping():
+    """Simple endpoint para comprobar conectividad (útil si el navegador bloquea /api/status)."""
+    return jsonify({"pong": True, "timestamp": datetime.now().isoformat()})
+
+# Log de peticiones entrantes y tamaño
+@app.before_request
+def log_request_info():
+    if request.path.startswith('/api'):
+        content_length = request.headers.get('Content-Length')
+        logger.info("Incoming request: %s %s Content-Length=%s", request.method, request.path, content_length)
 
 # --- Asynchronous conversion (returns job id) ---
 # Job management
@@ -103,6 +117,10 @@ def convert_pdf_to_speech():
 
     pdf_path = os.path.join(UPLOAD_FOLDER, pdf_filename)
     mp3_path = os.path.join(OUTPUT_FOLDER, mp3_filename)
+
+    # Comprobar tamaño del upload antes de guardar
+    if request.content_length and request.content_length > MAX_UPLOAD_SIZE:
+        return jsonify({"error": "Archivo demasiado grande (máx 10 MB)"}), 413
 
     # Guardar el PDF y encolar el trabajo
     pdf_file.save(pdf_path)
