@@ -48,14 +48,9 @@
                 <span class="text-sm text-green-400" id="server-status">Configurar URL</span>
             </div>
 
-            <div class="flex gap-2">
-                <input type="text" id="server-url" value="http://localhost:5000"
-                    placeholder="https://tuusuario.pythonanywhere.com"
-                    class="flex-1 bg-white/10 text-white border border-white/20 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
-                <button onclick="testServer()"
-                    class="px-4 py-2 rounded-lg font-semibold text-sm bg-green-500 hover:bg-green-600 text-white transition-all">
-                    Probar
-                </button>
+            <!-- La URL del servidor se fija por defecto y se oculta al usuario -->
+            <div class="flex gap-2" style="display:none">
+                <input type="hidden" id="server-url" value="https://pdf-voz-server.onrender.com" />
             </div>
         </div>
 
@@ -173,31 +168,7 @@
             </div>
         </div>
 
-        <!-- Instructions -->
-        <div class="mt-6 glass rounded-xl p-6 border border-white/10">
-            <h3 class="text-white font-bold mb-3 flex items-center gap-2">
-                <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Instrucciones de uso
-            </h3>
-            <div class="text-purple-200 text-sm space-y-2">
-                <p><strong>Para uso local:</strong></p>
-                <ol class="list-decimal list-inside space-y-1 ml-2">
-                    <li>Ejecuta el servidor: <code class="bg-black/30 px-2 py-1 rounded">python app.py</code></li>
-                    <li>Usa: <code class="bg-black/30 px-2 py-1 rounded">http://localhost:5000</code></li>
-                    <li>Haz clic en "Probar" para verificar conexión</li>
-                </ol>
 
-                <p class="mt-4"><strong>Para móvil (PythonAnywhere):</strong></p>
-                <ol class="list-decimal list-inside space-y-1 ml-2">
-                    <li>Sube el servidor a PythonAnywhere</li>
-                    <li>Copia tu URL de PythonAnywhere</li>
-                    <li>Pégala arriba y haz clic en "Probar"</li>
-                </ol>
-            </div>
-        </div>
 
         <!-- Footer -->
         <div class="text-center mt-8 pb-8">
@@ -235,6 +206,16 @@
             const panel = document.getElementById('settings-panel');
             panel.classList.toggle('hidden');
         }
+
+        // Al cargar la página: fijar URL del servidor por defecto y comprobar estado automáticamente
+        document.addEventListener('DOMContentLoaded', () => {
+            const serverUrlInput = document.getElementById('server-url');
+            if (serverUrlInput) {
+                serverUrlInput.value = 'https://pdf-voz-server.onrender.com';
+            }
+            document.getElementById('server-status').textContent = 'Conectando...';
+            testServer();
+        });
 
         function handleFileSelect(event) {
             const file = event.target.files[0];
