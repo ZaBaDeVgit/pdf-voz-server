@@ -7,6 +7,12 @@ import uuid
 from datetime import datetime
 import threading
 import time
+import concurrent.futures
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
+logger = logging.getLogger(__name__)
 
 # Configurar la aplicación para servir archivos estáticos
 app = Flask(__name__, static_folder='.', static_url_path='')
@@ -55,85 +61,173 @@ def api_status():
         }
     })
 
+# --- Asynchronous conversion (returns job id) ---
+# Job management
+jobs = {}
+jobs_lock = threading.Lock()
+JOB_TIMEOUT = 300  # seconds
+
 @app.route('/api/convert', methods=['POST'])
 def convert_pdf_to_speech():
+    # Validar que se envió un archivo
+    if 'pdf' not in request.files:
+        return jsonify({"error": "No se envió ningún archivo PDF"}), 400
+
+    pdf_file = request.files['pdf']
+
+    if pdf_file.filename == '':
+        return jsonify({"error": "Nombre de archivo vacío"}), 400
+
+    if not pdf_file.filename.endswith('.pdf'):
+        return jsonify({"error": "El archivo debe ser PDF"}), 400
+
+    # Obtener parámetros
+    voice = request.form.get('voice', 'es-ES')
+    speed = request.form.get('speed', 'normal')
+
+    # Mapeo de voces
+    voice_mapping = {
+        'es-ES': ('es', 'es'),
+        'es-MX': ('es', 'com.mx'),
+        'es-AR': ('es', 'com.ar'),
+        'en-US': ('en', 'us')
+    }
+
+    lang, tld = voice_mapping.get(voice, ('es', 'es'))
+    slow = (speed == 'lento')
+
+    # Generar nombres únicos
+    job_id = str(uuid.uuid4())
+    pdf_filename = f"{job_id}.pdf"
+    mp3_filename = f"{job_id}.mp3"
+
+    pdf_path = os.path.join(UPLOAD_FOLDER, pdf_filename)
+    mp3_path = os.path.join(OUTPUT_FOLDER, mp3_filename)
+
+    # Guardar el PDF y encolar el trabajo
+    pdf_file.save(pdf_path)
+    with jobs_lock:
+        jobs[job_id] = {
+            'status': 'pending',
+            'created': datetime.now().isoformat(),
+            'progress': 0,
+            'message': 'Queued',
+            'filename': mp3_filename,
+            'download_url': None,
+            'error': None
+        }
+
+    # Lanzar thread en background
+    thread = threading.Thread(target=lambda: do_conversion(job_id, pdf_path, mp3_path, voice, speed), daemon=True)
+    thread.start()
+
+    logger.info("Job %s queued (input=%s)", job_id, pdf_file.filename)
+    return jsonify({'job_id': job_id, 'status_url': f'/api/jobs/{job_id}'}), 202
+
+
+def do_conversion(job_id, pdf_path, mp3_path, voice, speed):
+    """Función que realiza la conversión en background y actualiza el diccionario jobs."""
     try:
-        # Validar que se envió un archivo
-        if 'pdf' not in request.files:
-            return jsonify({"error": "No se envió ningún archivo PDF"}), 400
+        with jobs_lock:
+            jobs[job_id]['status'] = 'running'
+            jobs[job_id]['progress'] = 5
+            jobs[job_id]['message'] = 'Running'
 
-        pdf_file = request.files['pdf']
+        start_time = time.monotonic()
 
-        if pdf_file.filename == '':
-            return jsonify({"error": "Nombre de archivo vacío"}), 400
-
-        if not pdf_file.filename.endswith('.pdf'):
-            return jsonify({"error": "El archivo debe ser PDF"}), 400
-
-        # Obtener parámetros
-        voice = request.form.get('voice', 'es-ES')
-        speed = request.form.get('speed', 'normal')
-
-        # Mapeo de voces
+        # Mapear voz
         voice_mapping = {
             'es-ES': ('es', 'es'),
             'es-MX': ('es', 'com.mx'),
             'es-AR': ('es', 'com.ar'),
             'en-US': ('en', 'us')
         }
-
         lang, tld = voice_mapping.get(voice, ('es', 'es'))
         slow = (speed == 'lento')
 
-        # Generar nombres únicos
-        unique_id = str(uuid.uuid4())
-        pdf_filename = f"{unique_id}.pdf"
-        mp3_filename = f"{unique_id}.mp3"
+        logger.info("Job %s: starting extraction", job_id)
+        with jobs_lock:
+            jobs[job_id]['progress'] = 20
+            jobs[job_id]['message'] = 'Extracting text'
 
-        pdf_path = os.path.join(UPLOAD_FOLDER, pdf_filename)
-        mp3_path = os.path.join(OUTPUT_FOLDER, mp3_filename)
-
-        # Guardar PDF temporalmente
-        pdf_file.save(pdf_path)
-
-        # Extraer texto del PDF
-        text = extract_text_from_pdf(pdf_path)
+        # Run extraction with a timeout to avoid blocking the worker indefinitely
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(extract_text_from_pdf, pdf_path)
+            try:
+                text = future.result(timeout=JOB_TIMEOUT)
+            except concurrent.futures.TimeoutError:
+                raise Exception('Text extraction timed out')
 
         if not text.strip():
-            os.remove(pdf_path)
-            return jsonify({"error": "No se pudo extraer texto del PDF"}), 400
+            raise Exception('No se pudo extraer texto del PDF')
 
-        # Convertir a voz
-        tts = gTTS(
-            text=text,
-            lang=lang,
-            tld=tld,
-            slow=slow,
-            lang_check=False
-        )
+        with jobs_lock:
+            jobs[job_id]['progress'] = 50
+            jobs[job_id]['message'] = 'Converting to speech'
 
-        tts.save(mp3_path)
+        # Check timeout before heavy work
+        elapsed = time.monotonic() - start_time
+        if elapsed > JOB_TIMEOUT:
+            raise Exception('Job timed out')
+
+        logger.info("Job %s: initializing TTS", job_id)
+        tts = gTTS(text=text, lang=lang, tld=tld, slow=slow, lang_check=False)
+
+        # Save TTS with timeout
+        elapsed = time.monotonic() - start_time
+        remaining = max(5, JOB_TIMEOUT - elapsed)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(tts.save, mp3_path)
+            try:
+                future.result(timeout=remaining)
+            except concurrent.futures.TimeoutError:
+                raise Exception('TTS generation/saving timed out')
 
         # Limpiar PDF temporal
-        os.remove(pdf_path)
+        try:
+            if os.path.exists(pdf_path):
+                os.remove(pdf_path)
+        except Exception:
+            pass
 
-        # Obtener tamaño del archivo
+        # Mark success
         file_size = os.path.getsize(mp3_path)
+        with jobs_lock:
+            jobs[job_id]['status'] = 'success'
+            jobs[job_id]['progress'] = 100
+            jobs[job_id]['message'] = 'Completed'
+            jobs[job_id]['download_url'] = f"/download/{jobs[job_id]['filename']}"
 
-        return jsonify({
-            "success": True,
-            "message": "Conversión completada exitosamente",
-            "filename": mp3_filename,
-            "download_url": f"/download/{mp3_filename}",
-            "file_size": file_size,
-            "text_length": len(text),
-            "timestamp": datetime.now().isoformat()
-        })
+        elapsed = time.monotonic() - start_time
+        logger.info("Job %s completed in %.1fs", job_id, elapsed)
 
     except Exception as e:
-        return jsonify({
-            "error": f"Error en la conversión: {str(e)}"
-        }), 500
+        logger.exception("Job %s failed: %s", job_id, e)
+        with jobs_lock:
+            jobs[job_id]['status'] = 'error'
+            jobs[job_id]['error'] = str(e)
+            jobs[job_id]['message'] = 'Failed'
+        # Cleanup any files
+        try:
+            if os.path.exists(pdf_path):
+                os.remove(pdf_path)
+        except Exception:
+            pass
+
+    finally:
+        # Ensure progress and message set
+        with jobs_lock:
+            if jobs[job_id]['status'] == 'running':
+                jobs[job_id]['status'] = 'error'
+                jobs[job_id]['message'] = 'Timeout or unknown error'
+
+@app.route('/api/jobs/<job_id>', methods=['GET'])
+def get_job_status(job_id):
+    with jobs_lock:
+        job = jobs.get(job_id)
+        if not job:
+            return jsonify({'error': 'Job no encontrado'}), 404
+        return jsonify(job)
 
 @app.route('/api/download/<filename>', methods=['GET'])
 def download_file(filename):

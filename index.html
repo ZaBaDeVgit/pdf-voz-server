@@ -324,41 +324,82 @@
                 formData.append('voice', voice);
                 formData.append('speed', speed);
 
-                // Simular progreso
+                // Simular progreso mientras el job arranca
                 let progress = 0;
                 const progressInterval = setInterval(() => {
-                    if (progress < 90) {
-                        progress += 10;
+                    if (progress < 95) {
+                        progress += 5;
                         document.getElementById('progress-bar').style.width = progress + '%';
                         document.getElementById('progress-text').textContent = progress + '%';
                     }
-                }, 500);
+                }, 800);
 
                 const response = await fetch(`${serverUrl}/api/convert`, {
                     method: 'POST',
                     body: formData,
                 });
 
-                clearInterval(progressInterval);
+                if (response.status === 202) {
+                    const jobData = await parseResponseJSONSafe(response);
+                    const jobId = jobData.job_id;
+                    const statusUrl = jobData.status_url;
 
-                if (!response.ok) {
-                    const errorData = await parseResponseJSONSafe(response);
-                    throw new Error(errorData && (errorData.error || errorData._raw) ? (errorData.error || errorData._raw) : 'Error en la conversión');
-                }
+                    updateStatus('Conversión en cola. Esperando a que termine...', 'processing');
 
-                const data = await parseResponseJSONSafe(response);
+                    // Polling
+                    const start = Date.now();
+                    let finished = false;
+                    while (!finished) {
+                        await new Promise((r) => setTimeout(r, 2000));
+                        try {
+                            const jobResp = await fetch(`${serverUrl}${statusUrl}`);
+                            const job = await parseResponseJSONSafe(jobResp);
 
-                if (data && data.success) {
-                    document.getElementById('progress-bar').style.width = '100%';
-                    document.getElementById('progress-text').textContent = '100%';
-                    downloadUrl = `${serverUrl}/api${data.download_url}`;
-                    document.getElementById('download-btn').classList.remove('hidden');
-                    updateStatus(
-                        `¡Conversión completada! Archivo listo para descargar (${(data.file_size / 1024 / 1024).toFixed(2)} MB)`,
-                        'success'
-                    );
+                            // update progress from job if available
+                            if (job && typeof job.progress === 'number') {
+                                document.getElementById('progress-bar').style.width = job.progress + '%';
+                                document.getElementById('progress-text').textContent = job.progress + '%';
+                            }
+
+                            if (job.status === 'success') {
+                                finished = true;
+                                clearInterval(progressInterval);
+                                document.getElementById('progress-bar').style.width = '100%';
+                                document.getElementById('progress-text').textContent = '100%';
+                                downloadUrl = `${serverUrl}/api${job.download_url}`;
+                                document.getElementById('download-btn').classList.remove('hidden');
+                                updateStatus('¡Conversión completada! Archivo listo para descargar', 'success');
+                                break;
+                            } else if (job.status === 'error') {
+                                finished = true;
+                                clearInterval(progressInterval);
+                                document.getElementById('progress-bar').style.width = '0%';
+                                updateStatus(`Error: ${job.error || job.message}. Asegúrate de que el servidor está ejecutándose.`, 'error');
+                                break;
+                            }
+
+                            // client-side timeout to avoid infinite polling (5 min)
+                            if (Date.now() - start > 5 * 60 * 1000) {
+                                finished = true;
+                                clearInterval(progressInterval);
+                                document.getElementById('progress-bar').style.width = '0%';
+                                updateStatus('La conversión excedió el tiempo máximo. Intenta nuevamente.', 'error');
+                                break;
+                            }
+
+                        } catch (err) {
+                            finished = true;
+                            clearInterval(progressInterval);
+                            document.getElementById('progress-bar').style.width = '0%';
+                            updateStatus(`Error: ${err.message}. Asegúrate de que el servidor está ejecutándose.`, 'error');
+                            break;
+                        }
+                    }
+
                 } else {
-                    throw new Error(data.error || 'Error desconocido');
+                    const errorData = await parseResponseJSONSafe(response);
+                    clearInterval(progressInterval);
+                    throw new Error(errorData && (errorData.error || errorData._raw) ? (errorData.error || errorData._raw) : 'Error en la conversión');
                 }
 
             } catch (error) {
