@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF a Voz PRO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #581c87 50%, #0f172a 100%);
+            min-height: 100vh;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body class="p-4">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-8 pt-8">
+            <div class="flex items-center justify-center gap-3 mb-3">
+                <svg class="w-10 h-10 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+                </svg>
+                <h1 class="text-4xl font-bold text-white">PDF a Voz PRO</h1>
+            </div>
+            <p class="text-purple-200">Conversión con voces de Google TTS y exportación MP3 real</p>
+        </div>
+
+        <!-- Server Status -->
+        <div class="glass rounded-xl p-4 mb-6">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+                    </svg>
+                    <span class="text-white font-semibold">Estado del servidor:</span>
+                </div>
+                <span class="text-sm text-green-400" id="server-status">Configurar URL</span>
+            </div>
+
+            <div class="flex gap-2">
+                <input
+                    type="text"
+                    id="server-url"
+                    value="http://localhost:5000"
+                    placeholder="https://tuusuario.pythonanywhere.com"
+                    class="flex-1 bg-white/10 text-white border border-white/20 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+                <button
+                    onclick="testServer()"
+                    class="px-4 py-2 rounded-lg font-semibold text-sm bg-green-500 hover:bg-green-600 text-white transition-all"
+                >
+                    Probar
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Card -->
+        <div class="glass rounded-2xl shadow-2xl p-6 md:p-8">
+
+            <!-- Upload Section -->
+            <div class="mb-6">
+                <label class="block text-white font-semibold mb-3 flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    1. SELECCIONA UN ARCHIVO PDF
+                </label>
+                <div class="flex gap-3">
+                    <input
+                        type="file"
+                        id="pdf-input"
+                        accept=".pdf"
+                        class="hidden"
+                        onchange="handleFileSelect(event)"
+                    />
+                    <button
+                        onclick="document.getElementById('pdf-input').click()"
+                        class="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-105"
+                        id="select-btn"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                        </svg>
+                        <span id="file-label">Seleccionar PDF</span>
+                    </button>
+                    <button
+                        onclick="resetApp()"
+                        class="bg-red-500 hover:bg-red-600 text-white p-3 rounded-xl transition-all hidden"
+                        id="reset-btn"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Settings Section -->
+            <div class="mb-6">
+                <button
+                    onclick="toggleSettings()"
+                    class="flex items-center gap-2 text-white font-semibold mb-3 hover:text-purple-300 transition-colors"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    2. CONFIGURACIÓN
+                </button>
+
+                <div id="settings-panel" class="bg-white/5 rounded-xl p-4 space-y-4 hidden">
+                    <div>
+                        <label class="block text-white text-sm mb-2">Idioma/Voz:</label>
+                        <select id="voice-select" class="w-full bg-white/10 text-white border border-white/20 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            <option value="es-ES">Español (España)</option>
+                            <option value="es-MX">Español (México)</option>
+                            <option value="es-AR">Español (Argentina)</option>
+                            <option value="en-US">English (US)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-white text-sm mb-2">Velocidad:</label>
+                        <select id="speed-select" class="w-full bg-white/10 text-white border border-white/20 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            <option value="lento">Lento</option>
+                            <option value="normal" selected>Normal</option>
+                            <option value="rapido">Rápido</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div id="progress-container" class="mb-6 hidden">
+                <div class="flex justify-between text-white text-sm mb-2">
+                    <span>Progreso de conversión</span>
+                    <span id="progress-text">0%</span>
+                </div>
+                <div class="w-full bg-white/10 rounded-full h-3 overflow-hidden">
+                    <div
+                        id="progress-bar"
+                        class="bg-gradient-to-r from-green-400 to-blue-500 h-full transition-all duration-300 rounded-full"
+                        style="width: 0%"
+                    ></div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-3 mb-6">
+                <button
+                    onclick="convertToAudio()"
+                    id="convert-btn"
+                    disabled
+                    class="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 disabled:from-gray-500 disabled:to-gray-600 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+                    </svg>
+                    <span id="convert-text">CONVERTIR A MP3</span>
+                </button>
+
+                <button
+                    onclick="downloadAudio()"
+                    id="download-btn"
+                    class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-105 hidden"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    DESCARGAR MP3
+                </button>
+            </div>
+
+            <!-- Status -->
+            <div id="status-box" class="glass rounded-xl p-4 flex items-start gap-3 border border-white/10">
+                <span class="text-2xl" id="status-icon">📄</span>
+                <p class="text-white text-sm leading-relaxed flex-1" id="status-text">
+                    Selecciona un archivo PDF para comenzar
+                </p>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="mt-6 glass rounded-xl p-6 border border-white/10">
+            <h3 class="text-white font-bold mb-3 flex items-center gap-2">
+                <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Instrucciones de uso
+            </h3>
+            <div class="text-purple-200 text-sm space-y-2">
+                <p><strong>Para uso local:</strong></p>
+                <ol class="list-decimal list-inside space-y-1 ml-2">
+                    <li>Ejecuta el servidor: <code class="bg-black/30 px-2 py-1 rounded">python app.py</code></li>
+                    <li>Usa: <code class="bg-black/30 px-2 py-1 rounded">http://localhost:5000</code></li>
+                    <li>Haz clic en "Probar" para verificar conexión</li>
+                </ol>
+
+                <p class="mt-4"><strong>Para móvil (PythonAnywhere):</strong></p>
+                <ol class="list-decimal list-inside space-y-1 ml-2">
+                    <li>Sube el servidor a PythonAnywhere</li>
+                    <li>Copia tu URL de PythonAnywhere</li>
+                    <li>Pégala arriba y haz clic en "Probar"</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-8 pb-8">
+            <p class="text-purple-200 text-sm">PDF a Voz PRO • Creado por ZaBaDeV • 2025</p>
+            <p class="text-purple-300 text-xs mt-2">🎙️ Voces reales de Google TTS • 🎵 Exportación MP3 • ☁️ Backend Flask</p>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        let downloadUrl = null;
+        const statusIcons = {
+            info: '📄',
+            success: '✅',
+            warning: '⚠️',
+            error: '❌',
+            processing: '⚙️'
+        };
+
+        function updateStatus(message, type = 'info') {
+            document.getElementById('status-text').textContent = message;
+            document.getElementById('status-icon').textContent = statusIcons[type];
+
+            const box = document.getElementById('status-box');
+            box.className = 'glass rounded-xl p-4 flex items-start gap-3 border ';
+
+            if (type === 'error') box.className += 'border-red-500/20 bg-red-500/10';
+            else if (type === 'success') box.className += 'border-green-500/20 bg-green-500/10';
+            else if (type === 'warning') box.className += 'border-yellow-500/20 bg-yellow-500/10';
+            else box.className += 'border-white/10';
+        }
+
+        function toggleSettings() {
+            const panel = document.getElementById('settings-panel');
+            panel.classList.toggle('hidden');
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file || file.type !== 'application/pdf') {
+                updateStatus('Por favor selecciona un archivo PDF válido', 'error');
+                return;
+            }
+
+            selectedFile = file;
+            document.getElementById('file-label').textContent = file.name;
+            document.getElementById('reset-btn').classList.remove('hidden');
+            document.getElementById('convert-btn').disabled = false;
+            document.getElementById('download-btn').classList.add('hidden');
+            downloadUrl = null;
+            updateStatus(`Archivo "${file.name}" seleccionado. Listo para convertir.`, 'success');
+        }
+
+        function resetApp() {
+            selectedFile = null;
+            downloadUrl = null;
+            document.getElementById('pdf-input').value = '';
+            document.getElementById('file-label').textContent = 'Seleccionar PDF';
+            document.getElementById('reset-btn').classList.add('hidden');
+            document.getElementById('convert-btn').disabled = true;
+            document.getElementById('download-btn').classList.add('hidden');
+            document.getElementById('progress-container').classList.add('hidden');
+            document.getElementById('progress-bar').style.width = '0%';
+            updateStatus('Aplicación reiniciada. Selecciona un nuevo archivo.', 'info');
+        }
+
+        async function testServer() {
+            const url = document.getElementById('server-url').value;
+            const status = document.getElementById('server-status');
+
+            try {
+                status.textContent = 'Probando...';
+                status.className = 'text-sm text-yellow-400';
+
+                const response = await fetch(`${url}/health`);
+                if (response.ok) {
+                    status.textContent = 'Conectado ✓';
+                    status.className = 'text-sm text-green-400';
+                    updateStatus('Servidor conectado correctamente', 'success');
+                } else {
+                    throw new Error('Servidor no responde');
+                }
+            } catch (error) {
+                status.textContent = 'Error de conexión';
+                status.className = 'text-sm text-red-400';
+                updateStatus('No se puede conectar al servidor. Verifica la URL.', 'error');
+            }
+        }
+
+        async function convertToAudio() {
+            if (!selectedFile) return;
+
+            const serverUrl = document.getElementById('server-url').value;
+            const voice = document.getElementById('voice-select').value;
+            const speed = document.getElementById('speed-select').value;
+
+            document.getElementById('convert-btn').disabled = true;
+            document.getElementById('convert-text').textContent = 'CONVIRTIENDO...';
+            document.getElementById('progress-container').classList.remove('hidden');
+            updateStatus('Subiendo PDF al servidor...', 'processing');
+
+            try {
+                const formData = new FormData();
+                formData.append('pdf', selectedFile);
+                formData.append('voice', voice);
+                formData.append('speed', speed);
+
+                // Simular progreso
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    if (progress < 90) {
+                        progress += 10;
+                        document.getElementById('progress-bar').style.width = progress + '%';
+                        document.getElementById('progress-text').textContent = progress + '%';
+                    }
+                }, 500);
+
+                const response = await fetch(`${serverUrl}/convert`, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                clearInterval(progressInterval);
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Error en la conversión');
+                }
+
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('progress-bar').style.width = '100%';
+                    document.getElementById('progress-text').textContent = '100%';
+                    downloadUrl = `${serverUrl}${data.download_url}`;
+                    document.getElementById('download-btn').classList.remove('hidden');
+                    updateStatus(
+                        `¡Conversión completada! Archivo listo para descargar (${(data.file_size / 1024 / 1024).toFixed(2)} MB)`,
+                        'success'
+                    );
+                } else {
+                    throw new Error(data.error || 'Error desconocido');
+                }
+
+            } catch (error) {
+                document.getElementById('progress-bar').style.width = '0%';
+                updateStatus(`Error: ${error.message}. Asegúrate de que el servidor está ejecutándose.`, 'error');
+            } finally {
+                document.getElementById('convert-btn').disabled = false;
+                document.getElementById('convert-text').textContent = 'CONVERTIR A MP3';
+            }
+        }
+
+        function downloadAudio() {
+            if (downloadUrl) {
+                window.open(downloadUrl, '_blank');
+                updateStatus('Descarga iniciada...', 'success');
+            }
+        }
+
+        // Test inicial del servidor al cargar
+        window.addEventListener('load', () => {
+            testServer();
+        });
+    </script>
+</body>
+</html>
