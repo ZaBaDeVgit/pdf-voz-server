@@ -1,86 +1,90 @@
-# PDF a Voz - Servidor de Conversión
+# PDF a Voz PRO 🎙️
 
-Aplicación web que convierte archivos PDF a archivos de audio MP3 utilizando síntesis de voz.
+![Captura de la aplicación](Captura.png)
 
-## Características
+**PDF a Voz PRO** convierte tus PDFs a MP3 usando voces reales de Google TTS. Es rápido, sencillo y pensado para producción con un flujo asíncrono que evita timeouts en peticiones largas.
 
-- Sube archivos PDF y conviértelos a audio MP3
-- Soporte para múltiples idiomas
-- Interfaz web intuitiva
-- API RESTful para integraciones
+---
 
-## Requisitos
+## 🚀 ¿Qué hace?
+
+- Convierte PDFs a MP3 con distintas voces/idiomas
+- Cola de trabajos en background (procesamiento asíncrono)
+- Progreso en la interfaz y descarga directa cuando termina
+- Validaciones (tamaño máximo, timeouts) y logging para facilitar debugging
+
+---
+
+## 🧰 Requisitos
 
 - Python 3.8+
-- pip
+- `pip` y `venv`
 
-## Instalación
+---
 
-1. Clona el repositorio:
-   ```bash
-   git clone https://github.com/tu-usuario/pdf-voz-server.git
-   cd pdf-voz-server
-   ```
+## 🏁 Inicio rápido (local)
 
-2. Crea un entorno virtual (recomendado):
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # En Windows: .\\venv\\Scripts\\activate
-   ```
-
-3. Instala las dependencias:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## Uso
-
-1. Inicia el servidor:
-   ```bash
-   python app.py
-   ```
-
-2. Abre tu navegador en:
-   ```
-   http://localhost:5000
-   ```
-
-## Despliegue en Producción
-
-Para desplegar en producción, considera usar:
-
-1. **Render.com** (Recomendado para principiantes)
-2. **PythonAnywhere** (Gratis para aplicaciones pequeñas)
-3. **Heroku** (Requiere tarjeta de crédito para verificación)
-4. **VPS** (DigitalOcean, Linode, AWS, etc.)
-
-### Despliegue en Render.com
-
-1. Crea una cuenta en [Render.com](https://render.com/)
-2. Haz clic en "New" y selecciona "Web Service"
-3. Conecta tu repositorio de GitHub
-4. Configura el servicio:
-   - Runtime: Python 3
-   - Build Command: `pip install -r requirements.txt`
-   - Start Command: `gunicorn app:app`
-5. Haz clic en "Create Web Service"
-
-## API
-
-### Convertir PDF a MP3
-```
-POST /convert
-Content-Type: multipart/form-data
-
-file: [archivo PDF]
-lang: [código de idioma, opcional, por defecto 'es']
+```bash
+git clone https://github.com/tu-usuario/pdf-voz-server.git
+cd pdf-voz-server
+python -m venv .venv
+# Windows:
+.\.venv\Scripts\activate
+# Unix/macOS:
+source .venv/bin/activate
+pip install -r requirements.txt
+python app.py
+# Abre: http://localhost:5000
 ```
 
-### Descargar archivo MP3
+> Nota: La UI por defecto intenta conectar a `https://pdf-voz-server.onrender.com`. Para pruebas locales puedes abrir `http://localhost:5000`.
+
+---
+
+## ⚙️ Despliegue en Render (recomendado)
+
+1. Sube tu repo a GitHub y crea un nuevo **Web Service** en Render.
+2. Asegúrate de que el `Procfile` esté en la raíz (ejemplo recomendado):
+
 ```
-GET /download/<nombre_archivo>
+web: gunicorn wsgi:app --timeout 120 --workers 2 --worker-class gthread --threads 4 --log-file -
 ```
 
-## Licencia
+3. Variables de entorno útiles:
+- `ENABLE_DEBUG_JOBS=1` (activar temporalmente para inspeccionar trabajos)
+- `DEBUG_JOBS_SECRET` (secreto para proteger el endpoint de debug)
+- `FLASK_DEBUG=0` (recomendado en producción)
+
+4. Despliega y revisa **Live Logs** para comprobar el procesamiento de jobs.
+
+---
+
+## 🔒 Seguridad y buenas prácticas
+
+- No dejes `ENABLE_DEBUG_JOBS` activado sin protección; añade `DEBUG_JOBS_SECRET` y úsalo con cabeceras al consultar `/api/debug/jobs`.
+- En producción desactiva el modo debug (`FLASK_DEBUG=0`) para evitar respuestas HTML con stack traces.
+- Para mayor escalabilidad y persistencia, integra Redis + RQ/Celery para la cola de trabajos.
+
+---
+
+## 🐞 Troubleshooting
+
+- `WORKER TIMEOUT` / 502: aumenta timeout en Gunicorn o usa un worker de background; la app ya usa jobs asíncronos.
+- `ERR_BLOCKED_BY_CLIENT` en `/api/status`: extensiones (adblock); prueba en incógnito o con `curl`.
+- Si un `job` devuelve 404 o error, revisa los logs en Render y usa `/api/debug/jobs` si tienes `ENABLE_DEBUG_JOBS=1`.
+
+---
+
+## 🤝 Contribuir
+
+¡Contribuciones bienvenidas! Abre un issue para proponer cambios grandes o abre un PR con tus modificaciones.
+
+---
+
+## 📜 Licencia
 
 MIT
+
+---
+
+¿Quieres que cree automáticamente un **pull request** con este README actualizado y la imagen `Captura.png` incluida, o prefieres que lo suba directamente al `main`? Dime cómo quieres proceder y lo hago por ti. ¡Quedó muy chulo! 🎉
