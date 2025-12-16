@@ -83,8 +83,11 @@ JOB_TIMEOUT = 300  # seconds
 
 @app.route('/api/convert', methods=['POST'])
 def convert_pdf_to_speech():
+    logger.info("Received /api/convert from %s Content-Length=%s", request.remote_addr, request.content_length)
+
     # Validar que se envió un archivo
     if 'pdf' not in request.files:
+        logger.warning("/api/convert called without 'pdf' file")
         return jsonify({"error": "No se envió ningún archivo PDF"}), 400
 
     pdf_file = request.files['pdf']
@@ -246,6 +249,14 @@ def get_job_status(job_id):
         if not job:
             return jsonify({'error': 'Job no encontrado'}), 404
         return jsonify(job)
+
+# Debug endpoint to list jobs (gated by env var for safety)
+@app.route('/api/debug/jobs', methods=['GET'])
+def debug_list_jobs():
+    if os.environ.get('ENABLE_DEBUG_JOBS') != '1':
+        return jsonify({'error': 'Not allowed'}), 403
+    with jobs_lock:
+        return jsonify({'jobs': jobs})
 
 @app.route('/api/download/<filename>', methods=['GET'])
 def download_file(filename):
