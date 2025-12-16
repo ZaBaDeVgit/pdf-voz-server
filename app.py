@@ -179,6 +179,28 @@ def health_check():
         "outputs_folder": os.path.exists(OUTPUT_FOLDER)
     })
 
+# --- Manejo global de errores para endpoints de la API (devuelve JSON en errores) ---
+@app.errorhandler(404)
+def handle_not_found(e):
+    if request.path.startswith('/api'):
+        return jsonify({'error': 'Endpoint no encontrado'}), 404
+    return e
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    # Devuelve JSON para errores en rutas /api; en otras rutas deja el comportamiento por defecto
+    from werkzeug.exceptions import HTTPException
+    if isinstance(e, HTTPException):
+        code = e.code
+        message = e.description
+    else:
+        code = 500
+        message = str(e)
+    if request.path.startswith('/api'):
+        return jsonify({'error': f'Error interno: {message}'}), code
+    # Para rutas no-API, relanzamos para mantener el modo debug o comportamiento por defecto
+    raise e
+
 if __name__ == '__main__':
     # Para desarrollo local
     app.run(debug=True, host='0.0.0.0', port=5000)

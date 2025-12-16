@@ -265,6 +265,22 @@
             updateStatus('Aplicación reiniciada. Selecciona un nuevo archivo.', 'info');
         }
 
+        // 🔧 Parse JSON safely: if response isn't JSON or is empty, return raw text under `_raw` and any parse error under `_parseError`.
+        async function parseResponseJSONSafe(response) {
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                try {
+                    return await response.json();
+                } catch (e) {
+                    const text = await response.text();
+                    return { _raw: text, _parseError: e.message };
+                }
+            } else {
+                const text = await response.text();
+                return { _raw: text };
+            }
+        }
+
         async function testServer() {
             const serverUrl = document.getElementById('server-url').value;
             const status = document.getElementById('server-status');
@@ -275,12 +291,13 @@
 
                 const response = await fetch(`${serverUrl}/api/status`);
                 if (response.ok) {
-                    const data = await response.json();
+                    const data = await parseResponseJSONSafe(response);
                     status.textContent = 'Conectado';
                     status.className = 'text-sm text-green-400';
-                    updateStatus(data.message || 'Servidor conectado correctamente', 'success');
+                    updateStatus((data && (data.message || data._raw)) || 'Servidor conectado correctamente', 'success');
                 } else {
-                    throw new Error('Servidor no responde correctamente');
+                    const err = await parseResponseJSONSafe(response);
+                    throw new Error(err && (err.error || err._raw) ? (err.error || err._raw) : 'Servidor no responde correctamente');
                 }
             } catch (error) {
                 status.textContent = 'Error de conexión';
@@ -325,13 +342,13 @@
                 clearInterval(progressInterval);
 
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Error en la conversión');
+                    const errorData = await parseResponseJSONSafe(response);
+                    throw new Error(errorData && (errorData.error || errorData._raw) ? (errorData.error || errorData._raw) : 'Error en la conversión');
                 }
 
-                const data = await response.json();
+                const data = await parseResponseJSONSafe(response);
 
-                if (data.success) {
+                if (data && data.success) {
                     document.getElementById('progress-bar').style.width = '100%';
                     document.getElementById('progress-text').textContent = '100%';
                     downloadUrl = `${serverUrl}/api${data.download_url}`;
