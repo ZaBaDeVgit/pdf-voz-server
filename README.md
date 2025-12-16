@@ -51,6 +51,7 @@ web: gunicorn wsgi:app --timeout 120 --workers 2 --worker-class gthread --thread
 ```
 
 3. Variables de entorno útiles:
+
 - `ENABLE_DEBUG_JOBS=1` (activar temporalmente para inspeccionar trabajos)
 - `DEBUG_JOBS_SECRET` (secreto para proteger el endpoint de debug)
 - `FLASK_DEBUG=0` (recomendado en producción)
