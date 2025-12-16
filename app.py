@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
 import PyPDF2
 from gtts import gTTS
@@ -8,7 +8,8 @@ from datetime import datetime
 import threading
 import time
 
-app = Flask(__name__)
+# Configurar la aplicación para servir archivos estáticos
+app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)  # Permitir peticiones desde cualquier origen
 
 # Configuración
@@ -37,18 +38,24 @@ def cleanup_old_files():
 cleanup_thread = threading.Thread(target=cleanup_old_files, daemon=True)
 cleanup_thread.start()
 
-@app.route('/', methods=['GET'])
-def home():
+# Ruta para servir el frontend
+@app.route('/')
+def serve_index():
+    return send_from_directory('.', 'index.html')
+
+# Ruta para verificar el estado de la API
+@app.route('/api/status')
+def api_status():
     return jsonify({
         "message": "PDF a Voz API - Servidor funcionando",
         "version": "1.0",
         "endpoints": {
-            "/convert": "POST - Convertir PDF a MP3",
-            "/download/<filename>": "GET - Descargar archivo MP3"
+            "/api/convert": "POST - Convertir PDF a MP3",
+            "/api/download/<filename>": "GET - Descargar archivo MP3"
         }
     })
 
-@app.route('/convert', methods=['POST'])
+@app.route('/api/convert', methods=['POST'])
 def convert_pdf_to_speech():
     try:
         # Validar que se envió un archivo
@@ -128,7 +135,7 @@ def convert_pdf_to_speech():
             "error": f"Error en la conversión: {str(e)}"
         }), 500
 
-@app.route('/download/<filename>', methods=['GET'])
+@app.route('/api/download/<filename>', methods=['GET'])
 def download_file(filename):
     try:
         # Validar nombre de archivo por seguridad
@@ -162,7 +169,7 @@ def extract_text_from_pdf(pdf_path):
     except Exception as e:
         raise Exception(f"Error al extraer texto: {str(e)}")
 
-@app.route('/health', methods=['GET'])
+@app.route('/api/health', methods=['GET'])
 def health_check():
     """Endpoint para verificar que el servidor está funcionando"""
     return jsonify({
