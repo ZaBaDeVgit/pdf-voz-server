@@ -88,4 +88,4 @@ MIT
 
 ---
 
-¿Quieres que cree automáticamente un **pull request** con este README actualizado y la imagen `Captura.png` incluida, o prefieres que lo suba directamente al `main`? Dime cómo quieres proceder y lo hago por ti. ¡Quedó muy chulo! 🎉
+
